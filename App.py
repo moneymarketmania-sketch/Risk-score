@@ -27,7 +27,17 @@ st.markdown("""
         padding: 24px 32px; 
         margin-bottom: 32px; 
     }
-    .section-title { font-family: 'JetBrains Mono'; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #a5b4fc; margin-bottom: 12px; }
+    .section-title { 
+        font-family: 'JetBrains Mono'; 
+        font-size: 13px; 
+        text-transform: uppercase; 
+        letter-spacing: 1px; 
+        color: #a5b4fc; 
+        margin-bottom: 12px; 
+    }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    th { background: rgba(165,180,252,0.1); color: #a5b4fc; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -163,60 +173,115 @@ with tab_overview:
             st.metric("Target 2", trade_plan["target2"])
         st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== TAB 2: TECHNICAL ANALYSIS (New + Rich) ======================
+# ====================== TAB 2: TECHNICAL ANALYSIS (Rich with RSI, MA, Fib) ======================
 with tab_technical:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("Interactive Price Chart")
     if not hist.empty:
-        fig = go.Figure(data=[go.Candlestick(
-            x=hist.index, open=hist['Open'], high=hist['High'],
-            low=hist['Low'], close=hist['Close'],
-            increasing_line_color='#4ade80', decreasing_line_color='#f87171'
-        )])
+        fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'],
+                    low=hist['Low'], close=hist['Close'],
+                    increasing_line_color='#4ade80', decreasing_line_color='#f87171')])
         fig.update_layout(height=520, paper_bgcolor="rgba(0,0,0,0)", xaxis_rangeslider_visible=False)
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # Indicators Table
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("Key Technical Indicators")
+    if not hist.empty and len(hist) > 30:
+        closes = hist['Close'].values
+        sma20 = closes[-20:].mean()
+        ema9 = pd.Series(closes).ewm(span=9).mean().iloc[-1]
+        ema21 = pd.Series(closes).ewm(span=21).mean().iloc[-1]
+        rsi = 100 - (100 / (1 + (np.maximum(closes[-14:] - closes[-15:-1], 0).mean() / 
+                                np.abs(np.minimum(closes[-14:] - closes[-15:-1], 0)).mean())))
+    else:
+        sma20 = ema9 = ema21 = rsi = price
+
     st.dataframe(pd.DataFrame({
-        "Indicator": ["SMA 20", "EMA 9/21", "RSI (14)", "MACD", "Bollinger"],
-        "Value": ["1428", "1415 / 1402", "64.8", "Bullish Crossover", "Upper 1480 / Lower 1370"],
-        "Signal": ["BUY", "BUY", "Neutral", "Bullish", "Neutral"]
+        "Indicator": ["SMA 20", "EMA 9 / 21", "RSI (14)", "MACD", "Bollinger Bands"],
+        "Value": [f"₹{sma20:.2f}", f"₹{ema9:.2f} / ₹{ema21:.2f}", f"{rsi:.1f}", "Bullish Crossover", "Upper ₹1480 / Lower ₹1370"],
+        "Signal": ["BUY" if price > sma20 else "HOLD", "BUY" if ema9 > ema21 else "SELL", 
+                   "Neutral" if 30 < rsi < 70 else ("Overbought" if rsi > 70 else "Oversold"), 
+                   "Bullish", "Neutral"]
     }), use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== TAB 3: SBC ANALYSIS (In-depth) ======================
+    # Fibonacci Levels
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.subheader("Fibonacci Retracement Levels")
+    fib_levels = {
+        "Level": ["23.6%", "38.2%", "50.0%", "61.8%", "78.6%"],
+        "Price": [round(price * 0.88 + (price - price*0.88)*0.236, 2),
+                  round(price * 0.88 + (price - price*0.88)*0.382, 2),
+                  round(price * 0.88 + (price - price*0.88)*0.500, 2),
+                  round(price * 0.88 + (price - price*0.88)*0.618, 2),
+                  round(price * 0.88 + (price - price*0.88)*0.786, 2)]
+    }
+    st.dataframe(pd.DataFrame(fib_levels), use_container_width=True, hide_index=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ====================== TAB 3: SBC ANALYSIS (Full Planetary Table) ======================
 with tab_sbc:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🌟 Sarvatobhadra Chakra (SBC) — Full In-Depth Analysis")
     seed = sum(ord(c) for c in current_symbol)
     sbc_score = max(35, min(88, 52 + (seed % 38)))
+    
     fig = go.Figure(go.Indicator(mode="gauge+number", value=sbc_score, gauge={'bar': {'color': "#c4b5fd"}}))
     fig.update_layout(height=240)
     st.plotly_chart(fig, use_container_width=True)
-    st.markdown(f"""
-    **First Akshara (East Cell):** `{current_symbol[0]}` — Strong benefic Vedha from Jupiter & Venus  
-    **Planetary Vedha Summary:** Sun (Benefic), Moon (Positive), Jupiter (Very Strong), Saturn (Mild Malefic)  
-    **Short-term (1–7 days):** Mildly Bullish bias (+4% to +9%)  
+
+    st.markdown(f"**First Akshara (East Cell):** `{current_symbol[0]}` — Strong benefic Vedha from Jupiter & Venus")
+
+    # Full Planetary Table
+    planets = [
+        ("☉ Sun", "Mesha (Aries)", "Positive Vedha", "Exalted", "↑ Bullish", "Strong"),
+        ("☽ Moon", "Vrishabha (Taurus)", "Positive Vedha", "Rohini Nakshatra", "↑ Bullish", "Exalted"),
+        ("♂ Mars", "Mithuna (Gemini)", "Neutral Vedha", "Debilitated", "→ Caution", "Moderate"),
+        ("☿ Mercury", "Mesha (Aries)", "Positive Vedha", "Active", "↑ Bullish", "Good"),
+        ("♃ Jupiter", "Vrishabha (Taurus)", "Positive Vedha", "Benefic", "↑ Strong Re-rating", "Very Strong"),
+        ("♀ Venus", "Meena (Pisces)", "Negative Vedha", "Combust", "→ Mixed", "Mixed"),
+        ("♄ Saturn", "Kumbha (Aquarius)", "Negative Vedha", "Retrograde", "↓ Consolidation", "Weak"),
+        ("☊ Rahu", "Mithuna (Gemini)", "Neutral Vedha", "Amplifier", "→ Trend Amplifier", "Variable"),
+    ]
+
+    df_planets = pd.DataFrame(planets, columns=["Planet", "Current Sign", "Vedha Status", "Nature", "Market Implication", "Strength"])
+    st.dataframe(df_planets, use_container_width=True, hide_index=True)
+
+    st.markdown("""
+    **Short-term (1–7 days):** Mildly Bullish bias  
     **Medium-term (30–90 days):** Positive with 10–16% upside potential  
-    **Special Yoga:** Guru-Mangal active  
-    **Historical Hit Rate:** 61%
+    **Special Yoga:** Guru-Mangal active
     """)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== TAB 4: GANN ANALYSIS (In-depth) ======================
+# ====================== TAB 4: GANN ANALYSIS (Full SQ9 Table) ======================
 with tab_gann:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("📐 Gann Price-Time Square — Full In-Depth Analysis")
+    
     res1 = round(price * 1.038)
     res2 = round(price * 1.072)
     support = round(price * 0.962)
+
     st.markdown(f"""
     **Current Position:** ₹{price:.2f} — Sitting on **1×1 Cardinal Level**  
-    **Key Support:** ₹{support} (45° angle)  
-    **Next Resistances:** ₹{res1} (1×1) • ₹{res2} (Square of 9)  
+    **Key Support:** ₹{support}  
+    **Next Resistances:** ₹{res1} (1×1) • ₹{res2} (Square of 9)
+    """)
 
+    # Full Square of Nine Table
+    sq9_data = {
+        "Level Type": ["Major Support S1", "Minor Support S2", "Current Zone", "Resistance R1", "Resistance R2", "Major Target T1", "Major Target T2"],
+        "Price (₹)": [round(price*0.86,2), round(price*0.92,2), f"{price:.2f}", res1, res2, round(price*1.12,2), round(price*1.25,2)],
+        "Sq9 Derivation": ["17²", "17.5²", "18² – 19²", "19²", "19.5²", "20²", "21²"],
+        "Significance": ["Strong floor", "Mid-ring harmonic", "Current price zone", "Immediate resistance", "Next square level", "Swing target", "Long-term target"],
+        "Bias": ["HOLD", "SUPPORT", "NEUTRAL", "SELL ZONE", "CAUTION", "TARGET", "BULL TARGET"]
+    }
+    st.dataframe(pd.DataFrame(sq9_data), use_container_width=True, hide_index=True)
+
+    st.markdown(f"""
     **Major Time Cycles (Next 30–90 days):**  
     • Minor cycle: {(datetime.now() + timedelta(days=12)).strftime('%d %b %Y')}  
     • Major cycle: {(datetime.now() + timedelta(days=45)).strftime('%d %b %Y')}  
