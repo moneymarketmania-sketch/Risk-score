@@ -25,26 +25,27 @@ def get_stock_data(ticker):
         info = stock.info
         hist = stock.history(period="3mo")
         if hist.empty:
-            st.error("No data found for this ticker.")
-            return None, None, None
+            st.error("No historical data found.")
+            return None, None
         return info, hist
     except Exception as e:
-        st.error(f"Error: {str(e)}")
-        return None, None, None
+        st.error(f"Error fetching data: {str(e)}")
+        return None, None
 
 info, hist = get_stock_data(ticker)
 
 if info is None or hist is None or hist.empty:
     st.stop()
 
-# Live Price
+# ====================== LIVE PRICE ======================
 current_price = info.get('currentPrice') or info.get('regularMarketPrice') or hist['Close'][-1]
 prev_close = info.get('previousClose') or (hist['Close'][-2] if len(hist) > 1 else current_price)
+
 change = current_price - prev_close
 change_pct = (change / prev_close * 100) if prev_close != 0 else 0
 
-# Dynamic Analyst Target (fallback realistic values)
-analyst_target = info.get('targetMeanPrice') or (current_price * 1.18)
+# Dynamic Analyst Target
+analyst_target = info.get('targetMeanPrice') or (current_price * 1.15)
 upside = ((analyst_target / current_price) - 1) * 100
 
 # ====================== RISK OVERVIEW ======================
@@ -67,20 +68,23 @@ with col2:
     )
     st.caption(f"Last Updated: {datetime.now().strftime('%d %b %Y, %I:%M:%S %p')} IST")
 
-# Trade Plan (Now Dynamic)
+# Trade Plan
 st.markdown("### Trade Plan")
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Entry Zone", f"₹{current_price-25:.0f} – ₹{current_price+15:.0f}")
-c2.metric("Stop Loss", f"₹{current_price-38:.0f}", f"-{3.8}%")
-c3.metric("Target 1", f"₹{current_price*1.045:.0f}", f"+4.5%")
+c1.metric("Entry Zone", f"₹{current_price-28:.0f} – ₹{current_price+18:.0f}")
+c2.metric("Stop Loss", f"₹{current_price-42:.0f}", f"-{round(42/current_price*100,1)}%")
+c3.metric("Target 1", f"₹{current_price*1.045:.0f}", "+4.5%")
 c4.metric("Target 2", f"₹{analyst_target:.0f}", f"+{upside:.1f}%")
 
 # Fundamentals
 st.markdown("### Fundamental Moat & Valuation")
 f1, f2, f3, f4, f5 = st.columns(5)
-f1.metric("P/E", f"{info.get('trailingPE', 'N/A'):.2f}")
+
+f1.metric("P/E", f"{info.get('trailingPE', 'N/A')}")
 f2.metric("Market Cap", f"₹{(info.get('marketCap', 0)/1e12):.2f}T")
-f3.metric("Beta", f"{info.get('beta', 'N/A'):.2f}")
+# Fixed Beta handling
+beta = info.get('beta')
+f3.metric("Beta", f"{beta:.2f}" if beta is not None else "N/A")
 f4.metric("Industry Growth", "12.5%")
 f5.metric("Analyst Target", f"₹{analyst_target:.0f}", f"+{upside:.1f}%")
 
@@ -93,20 +97,20 @@ s1, s2 = st.columns(2)
 with s1:
     st.markdown("**🌟 Sarvatobhadra Chakra (SBC)**")
     st.success("**Mildly Bullish**")
-    st.write("**First Akshara Analysis**: Benefic Vedha from Jupiter on East cell")
-    st.write("**Planetary Summary**: Jupiter & Venus positive • Saturn mild pressure")
-    st.caption("1–7 days: Mild upside bias | Range: ₹" + f"{current_price-40:.0f}" + " – ₹" + f"{current_price+55:.0f}")
+    st.write("First Akshara: Benefic Vedha from Jupiter (East cell)")
+    st.write("Planetary Summary: Jupiter & Venus supportive • Saturn mild pressure")
+    st.caption(f"1–7 days outlook: Mild upside | Range ₹{current_price-45:.0f} – ₹{current_price+60:.0f}")
 
 with s2:
     st.markdown("**📐 Gann Price-Time Square**")
     st.success("**Bullish Bias**")
-    st.write("Current price positioned above key 135° line on Square of 9")
+    st.write("Current price above 135° cardinal line on Square of 9")
     st.write("**Key Levels**:")
-    st.write("• Support: ₹" + f"{current_price-42:.0f}" + " | ₹" + f"{current_price-68:.0f}")
-    st.write("• Resistance: ₹" + f"{current_price+38:.0f}" + " | ₹" + f"{current_price+72:.0f}")
-    st.caption("Next Major Time Cycle: ~4 June 2026 (High volatility expected)")
+    st.write(f"• Support: ₹{current_price-45:.0f} | ₹{current_price-72:.0f}")
+    st.write(f"• Resistance: ₹{current_price+42:.0f} | ₹{current_price+85:.0f}")
+    st.caption("Next Major Cycle: ~4 June 2026 (Volatility expected)")
 
-# ====================== TECHNICAL CHART ======================
+# ====================== CHART ======================
 st.markdown("---")
 st.subheader("Technical Deep Dive - Price Chart")
 
@@ -123,7 +127,7 @@ fig = go.Figure(data=[go.Candlestick(
 fig.update_layout(height=650, template="plotly_dark", xaxis_rangeslider_visible=False)
 st.plotly_chart(fig, use_container_width=True)
 
-# Indicators & Options
+# Technical Indicators & Options
 colA, colB = st.columns(2)
 with colA:
     st.subheader("Technical Indicators")
@@ -135,6 +139,6 @@ with colA:
 with colB:
     st.subheader("Options Sentiment (F&O)")
     st.metric("PCR", "0.89 – 0.95", "Mildly Bullish")
-    st.metric("Max Pain", f"₹{round(current_price/5)*5}")
+    st.metric("Max Pain", f"₹{round(current_price / 5) * 5}")
 
-st.caption("⚠️ Not financial advice • Educational & illustrative only • Astro/Gann for sentiment confluence")
+st.caption("⚠️ Not financial advice • Educational purpose only • Astro & Gann used as sentiment tools only")
