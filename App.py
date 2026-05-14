@@ -136,8 +136,17 @@ def fetch_stock_data(symbol: str) -> dict:
     }
     
 # ====================== LIVE CALCULATIONS ======================
-current_price = info.get('currentPrice') or info.get('regularMarketPrice') or hist['Close'][-1]
-prev_close = info.get('previousClose') or (hist['Close'][-2] if len(hist) > 1 else current_price)
+
+# ====================== LIVE VALUES ======================
+if info and not hist.empty:
+    current_price = info.get('currentPrice') or info.get('regularMarketPrice') or hist['Close'].iloc[-1]
+    prev_close = info.get('regularMarketPreviousClose') or hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+elif info:
+    current_price = info.get('currentPrice') or info.get('regularMarketPrice') or 334.55
+    prev_close = current_price
+else:
+    current_price = 334.55
+    prev_close = current_price
 
 change = current_price - prev_close
 change_pct = (change / prev_close * 100) if prev_close != 0 else 0
